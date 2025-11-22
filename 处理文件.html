@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel数据处理与展示</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .header {
+            background: linear-gradient(135deg, #0066cc 0%, #0099ff 100%);
+            color: white;
+            padding: 2rem 0;
+            border-radius: 0 0 20px 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .card {
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s ease;
+            margin-bottom: 20px;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        .upload-area {
+            border: 2px dashed #dee2e6;
+            border-radius: 10px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upload-area:hover, .upload-area.dragover {
+            border-color: #0066cc;
+            background-color: #f0f8ff;
+        }
+        .file-input {
+            display: none;
+        }
+        .result-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .result-table th {
+            background-color: #e9ecef;
+            position: sticky;
+            top: 0;
+        }
+        .table-container {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #0066cc 0%, #0099ff 100%);
+            border: none;
+            border-radius: 8px;
+            padding: 10px 20px;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #0052a3 0%, #0077cc 100%);
+        }
+        .loading {
+            display: none;
+        }
+        .step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .step-number {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-color: #0066cc;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+        }
+        .feature-icon {
+            width: 50px;
+            height: 50px;
+            background-color: #e6f2ff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            color: #0066cc;
+        }
+        .export-options {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <!-- 头部 -->
+    <div class="header mb-5">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1><i class="fas fa-file-excel me-2"></i>Excel数据处理工具</h1>
+                    <p class="lead">上传Excel文件，自动提取规格信息并生成汇总结果</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="feature-icon d-inline-flex">
+                        <i class="fas fa-cogs fa-lg"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 功能说明 -->
+        <div class="row mb-5">
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-info-circle me-2"></i>功能说明</h5>
+                        <div class="step">
+                            <div class="step-number">1</div>
+                            <span>上传包含规格信息的Excel文件</span>
+                        </div>
+                        <div class="step">
+                            <div class="step-number">2</div>
+                            <span>系统自动提取颜色和尺寸信息</span>
+                        </div>
+                        <div class="step">
+                            <div class="step-number">3</div>
+                            <span>按指定尺寸顺序排序并汇总</span>
+                        </div>
+                        <div class="step">
+                            <div class="step-number">4</div>
+                            <span>生成格式化结果并下载</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-upload me-2"></i>上传Excel文件</h5>
+                        <div class="upload-area" id="uploadArea">
+                            <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                            <h5>拖放文件到此处或点击上传</h5>
+                            <p class="text-muted">支持 .xlsx 格式的Excel文件</p>
+                            <button class="btn btn-primary mt-2">选择文件</button>
+                            <input type="file" id="fileInput" class="file-input" accept=".xlsx">
+                        </div>
+                        <div class="loading mt-3 text-center" id="loading">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">处理中...</span>
+                            </div>
+                            <p class="mt-2">正在处理文件，请稍候...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 结果显示区域 -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-table me-2"></i>处理结果</h5>
+                        <div id="resultArea" class="table-container">
+                            <p class="text-center text-muted p-4">上传Excel文件后，处理结果将在此显示</p>
+                        </div>
+                        <div class="mt-3 text-end" id="downloadArea" style="display: none;">
+                            <div class="export-options">
+                                <div class="row align-items-center">
+                                    <div class="col-md-6">
+                                        <label for="fileName" class="form-label">文件名：</label>
+                                        <input type="text" id="fileName" class="form-control" value="汇总结果" placeholder="请输入文件名">
+                                    </div>
+                                    <div class="col-md-6 text-end">
+                                        <button class="btn btn-success" id="downloadBtn">
+                                            <i class="fas fa-download me-2"></i>下载Excel文件
+                                        </button>
+                                        <button class="btn btn-outline-primary ms-2" id="downloadCsvBtn">
+                                            <i class="fas fa-file-csv me-2"></i>下载CSV
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 页脚 -->
+    <footer class="mt-5 py-4 bg-light">
+        <div class="container text-center">
+            <p class="mb-0 text-muted">Excel数据处理工具 &copy; 2023</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script>
+        // 全局变量存储处理结果
+        let currentResults = [];
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+            const resultArea = document.getElementById('resultArea');
+            const loading = document.getElementById('loading');
+            const downloadArea = document.getElementById('downloadArea');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const downloadCsvBtn = document.getElementById('downloadCsvBtn');
+            const fileNameInput = document.getElementById('fileName');
+
+            // 点击上传区域触发文件选择
+            uploadArea.addEventListener('click', function() {
+                fileInput.click();
+            });
+
+            // 文件选择变化
+            fileInput.addEventListener('change', function(e) {
+                if (e.target.files.length > 0) {
+                    processExcelFile(e.target.files[0]);
+                }
+            });
+
+            // 拖放功能
+            uploadArea.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+
+            uploadArea.addEventListener('dragleave', function() {
+                uploadArea.classList.remove('dragover');
+            });
+
+            uploadArea.addEventListener('drop', function(e) {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                if (e.dataTransfer.files.length > 0) {
+                    processExcelFile(e.dataTransfer.files[0]);
+                }
+            });
+
+            // 处理Excel文件
+            function processExcelFile(file) {
+                if (!file.name.endsWith('.xlsx')) {
+                    alert('请上传.xlsx格式的Excel文件');
+                    return;
+                }
+
+                loading.style.display = 'block';
+                resultArea.innerHTML = '<p class="text-center text-muted p-4">正在处理文件，请稍候...</p>';
+                downloadArea.style.display = 'none';
+
+                const reader = new FileReader();
+
+                reader.onload = function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+
+                        // 模拟后端处理 - 这里应该发送到实际的后端
+                        setTimeout(() => {
+                            // 模拟处理结果
+                            const result = simulateProcessing(workbook);
+                            currentResults = result; // 保存结果到全局变量
+                            displayResults(result);
+                            loading.style.display = 'none';
+                        }, 1500);
+                    } catch (error) {
+                        console.error('处理文件时出错:', error);
+                        loading.style.display = 'none';
+                        resultArea.innerHTML = '<p class="text-center text-danger p-4">处理文件时出错，请检查文件格式是否正确</p>';
+                    }
+                };
+
+                reader.readAsArrayBuffer(file);
+            }
+
+            // 模拟后端处理逻辑
+            function simulateProcessing(workbook) {
+                // 这里模拟处理逻辑，实际应用中应发送到后端处理
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                // 模拟处理结果
+                const results = [];
+                const sampleData = [
+                    { code: 'TS001', color: '红色', sizes: 'S*2,M*3,L*5,XL*4' },
+                    { code: 'TS002', color: '蓝色', sizes: 'S*1,M*4,2XL*2' },
+                    { code: 'TS003', color: '黑色', sizes: 'M*3,L*2,XL*5,2XL*1' },
+                    { code: 'TS004', color: '白色', sizes: 'S*2,XL*3,3XL*2' }
+                ];
+
+                sampleData.forEach(item => {
+                    results.push({
+                        code: item.code,
+                        color: item.color,
+                        result: `${item.code}-${item.color} ：${item.sizes}`
+                    });
+                });
+
+                return results;
+            }
+
+            // 显示处理结果
+            function displayResults(results) {
+                if (results.length === 0) {
+                    resultArea.innerHTML = '<p class="text-center text-muted p-4">未找到可处理的数据</p>';
+                    return;
+                }
+
+                let tableHTML = `
+                    <table class="table table-striped result-table">
+                        <thead>
+                            <tr>
+                                <th>序号</th>
+                                <th>规格编码</th>
+                                <th>颜色</th>
+                                <th>汇总结果</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                results.forEach((item, index) => {
+                    tableHTML += `
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td>${item.code}</td>
+                            <td>${item.color}</td>
+                            <td>${item.result}</td>
+                        </tr>
+                    `;
+                });
+
+                tableHTML += `
+                        </tbody>
+                    </table>
+                `;
+
+                resultArea.innerHTML = tableHTML;
+                downloadArea.style.display = 'block';
+            }
+
+            // 下载Excel文件
+            downloadBtn.addEventListener('click', function() {
+                if (currentResults.length === 0) {
+                    alert('请先上传并处理Excel文件');
+                    return;
+                }
+
+                const fileName = fileNameInput.value || '汇总结果';
+
+                // 创建工作簿
+                const wb = XLSX.utils.book_new();
+
+                // 准备数据
+                const excelData = [
+                    ['序号', '规格编码', '颜色', '汇总结果']
+                ];
+
+                currentResults.forEach((item, index) => {
+                    excelData.push([
+                        index + 1,
+                        item.code,
+                        item.color,
+                        item.result
+                    ]);
+                });
+
+                // 创建工作表
+                const ws = XLSX.utils.aoa_to_sheet(excelData);
+
+                // 设置列宽
+                const colWidths = [
+                    { wch: 8 },  // 序号列宽
+                    { wch: 15 }, // 规格编码列宽
+                    { wch: 10 }, // 颜色列宽
+                    { wch: 50 }  // 汇总结果列宽
+                ];
+                ws['!cols'] = colWidths;
+
+                // 设置标题行样式
+                if (ws['A1']) {
+                    ws['A1'].s = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '4472C4' } } };
+                }
+                if (ws['B1']) {
+                    ws['B1'].s = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '4472C4' } } };
+                }
+                if (ws['C1']) {
+                    ws['C1'].s = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '4472C4' } } };
+                }
+                if (ws['D1']) {
+                    ws['D1'].s = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '4472C4' } } };
+                }
+
+                // 添加工作表到工作簿
+                XLSX.utils.book_append_sheet(wb, ws, '汇总结果');
+
+                // 生成Excel文件并下载
+                XLSX.writeFile(wb, `${fileName}.xlsx`);
+            });
+
+            // 下载CSV文件
+            downloadCsvBtn.addEventListener('click', function() {
+                if (currentResults.length === 0) {
+                    alert('请先上传并处理Excel文件');
+                    return;
+                }
+
+                const fileName = fileNameInput.value || '汇总结果';
+
+                // 准备CSV数据
+                let csvContent = '序号,规格编码,颜色,汇总结果\n';
+
+                currentResults.forEach((item, index) => {
+                    csvContent += `${index + 1},${item.code},${item.color},"${item.result}"\n`;
+                });
+
+                // 创建Blob对象并下载
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+
+                if (link.download !== undefined) {
+                    const url = URL.createObjectURL(blob);
+                    link.setAttribute('href', url);
+                    link.setAttribute('download', `${fileName}.csv`);
+                    link.style.visibility = 'hidden';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
