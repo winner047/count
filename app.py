@@ -93,7 +93,7 @@ def process_excel_data(file_path):
         lambda x: sort_sizes(x.tolist())
     ).reset_index()
 
-    result_df['结果'] = result_df['规格编码'] + '-' + result_df['颜色'] + ' ：' + result_df['尺寸数量']
+    result_df['结果'] = result_df['规格编码'] + '-' + result_df['颜色'] + '-' + result_df['尺寸数量']
 
     return result_df
 
