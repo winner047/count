@@ -30,13 +30,9 @@ else:
     processed_data_store = {}
 
 
-# 使用简单的内存存储（生产环境应使用数据库或会话）
-# processed_data_store = {}  # 注释掉原来的定义
-# 使用简单的内存存储（生产环境应使用数据库或会话）
-# processed_data_store = {}
 def process_excel_data(file_path):
     """
-    直接处理Excel文件，按照指定尺寸顺序排序
+    直接处理Excel文件，按照指定尺寸顺序排序，并去除时间标记
     """
     # 读取Excel文件
     df = pd.read_excel(file_path)
@@ -55,6 +51,18 @@ def process_excel_data(file_path):
     df[['颜色', '尺寸']] = df['规格名称'].apply(
         lambda x: pd.Series(extract_color_size(x))
     )
+
+    # 去除尺寸中的时间标记（如"48小时内发货"）
+    def clean_size(size_str):
+        # 使用正则表达式去除时间标记
+        cleaned_size = re.sub(r'\s*48小时内发货\s*', '', str(size_str))
+        cleaned_size = re.sub(r'\s*;\s*', '', cleaned_size)
+        cleaned_size = re.sub(r'\s*72小时内发货\s*', '', cleaned_size)
+        cleaned_size = re.sub(r'\s*一周内发货\s*', '', cleaned_size)
+        # 可以继续添加其他时间标记的正则表达式
+        return cleaned_size.strip()
+
+    df['尺寸'] = df['尺寸'].apply(clean_size)
 
     # 分组汇总
     grouped = df.groupby(['规格编码', '颜色', '尺寸'])['规格数量'].sum().reset_index()
@@ -614,4 +622,3 @@ def download_csv():
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=7100)
-
