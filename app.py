@@ -66,7 +66,20 @@ def process_excel_data(file_path):
 
     # 分组汇总
     grouped = df.groupby(['规格编码', '颜色', '尺寸'])['规格数量'].sum().reset_index()
-    grouped['尺寸数量'] = grouped['尺寸'] + '*' + grouped['规格数量'].astype(str)
+
+    # 修正尺寸格式：将"M 1"改为"M"，并在数量后添加"件"
+    def format_size_quantity(row):
+        size = str(row['尺寸']).strip()
+        quantity = str(row['规格数量'])
+
+        # 处理尺寸格式：去除尺寸和数字之间的空格和多余的数字
+        # 例如将"M 1"改为"M"
+        size = re.sub(r'(\D+)\s*\d*', r'\1', size)
+
+        # 返回格式：尺寸*数量件
+        return f"{size}*{quantity}件"
+
+    grouped['尺寸数量'] = grouped.apply(format_size_quantity, axis=1)
 
     # 定义尺寸顺序
     size_order = ['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL']
@@ -78,11 +91,13 @@ def process_excel_data(file_path):
 
         # 创建排序键：按照size_order中的索引排序，不在顺序中的放在最后
         def get_sort_key(item):
-            size = item.split('*')[0]  # 提取尺寸部分
-            if size in size_order:
-                return size_order.index(size)
-            else:
-                return len(size_order)  # 不在顺序中的放在最后
+            # 提取尺寸部分（去掉*和后面的内容）
+            size_match = re.match(r'([^*]+)', item)
+            if size_match:
+                size = size_match.group(1).strip()
+                if size in size_order:
+                    return size_order.index(size)
+            return len(size_order)  # 不在顺序中的放在最后
 
         # 按照尺寸顺序排序
         sorted_items = sorted(items, key=get_sort_key)
@@ -90,7 +105,7 @@ def process_excel_data(file_path):
         # 使用中文逗号连接，最后一个使用中文逗号
         if len(sorted_items) > 1:
             # 前面部分用英文逗号，最后一个用中文逗号连接
-            result = ','.join(sorted_items[:-1]) + '，' + sorted_items[-1]
+            result = '，'.join(sorted_items[:-1]) + '，' + sorted_items[-1]
         else:
             result = ''.join(sorted_items)
 
