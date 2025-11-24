@@ -59,39 +59,68 @@ def process_excel_data(file_path):
         cleaned_size = re.sub(r'\s*;\s*', '', cleaned_size)
         cleaned_size = re.sub(r'\s*72小时内发货\s*', '', cleaned_size)
         cleaned_size = re.sub(r'\s*一周内发货\s*', '', cleaned_size)
+        cleaned_size = re.sub(r'\d+\s*天内发货\s*', '', cleaned_size)
         # 可以继续添加其他时间标记的正则表达式
         return cleaned_size.strip()
 
     df['尺寸'] = df['尺寸'].apply(clean_size)
 
-    # 分组汇总
-    grouped = df.groupby(['规格编码', '颜色', '尺寸'])['规格数量'].sum().reset_index()
+    # 标准化尺寸格式：将"M 1"改为"M"，统一尺寸表示
+    def normalize_size(size_str):
+        # 提取尺寸部分（字母部分）
+        size_match = re.match(r'([A-Za-z]+)\s*\d*', str(size_str).strip())
+        if size_match:
+            return size_match.group(1).upper()  # 返回大写的尺寸字母
+        return str(size_str).strip()
 
-    # 修正尺寸格式：将"M 1"改为"M"，并在数量后添加"件"
+    df['标准化尺寸'] = df['尺寸'].apply(normalize_size)
+
+    # 分组汇总 - 使用标准化后的尺寸确保相同尺寸正确分组
+    grouped = df.groupby(['规格编码', '颜色', '标准化尺寸'])['规格数量'].sum().reset_index()
+
+    # 修正尺寸格式
     def format_size_quantity(row):
-        size = str(row['尺寸']).strip()
-        quantity = str(row['规格数量'])
+        size = str(row['标准化尺寸']).strip()
+        quantity = int(row['规格数量'])
 
-        # 处理尺寸格式：去除尺寸和数字之间的空格和多余的数字
-        # 例如将"M 1"改为"M"
-        size = re.sub(r'(\D+)\s*\d*', r'\1', size)
-
-        # 返回格式：尺寸*数量件
-        return f"{size}*{quantity}件"
+        # 返回格式：尺寸*数量
+        return f"{size}*{quantity}"
 
     grouped['尺寸数量'] = grouped.apply(format_size_quantity, axis=1)
 
     # 定义尺寸顺序
     size_order = ['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL']
 
-    # 按照指定尺寸顺序排序
-    def sort_sizes(size_quantity_list):
-        # 将尺寸数量字符串拆分为列表
-        items = [item for item in size_quantity_list if item]
+    # 按照指定尺寸顺序排序，并合并相同尺寸
+    def sort_and_merge_sizes(size_quantity_list):
+        # 创建字典来合并相同尺寸的数量
+        size_quantity_dict = {}
+
+        for item in size_quantity_list:
+            if not item:
+                continue
+
+            # 解析尺寸和数量
+            parts = item.split('*')
+            if len(parts) == 2:
+                size = parts[0].strip()
+                try:
+                    quantity = int(parts[1])
+
+                    # 合并相同尺寸的数量
+                    if size in size_quantity_dict:
+                        size_quantity_dict[size] += quantity
+                    else:
+                        size_quantity_dict[size] = quantity
+                except ValueError:
+                    # 如果数量不是数字，跳过此项
+                    continue
+
+        # 重新生成合并后的项目
+        merged_items = [f"{size}*{quantity}" for size, quantity in size_quantity_dict.items()]
 
         # 创建排序键：按照size_order中的索引排序，不在顺序中的放在最后
         def get_sort_key(item):
-            # 提取尺寸部分（去掉*和后面的内容）
             size_match = re.match(r'([^*]+)', item)
             if size_match:
                 size = size_match.group(1).strip()
@@ -100,12 +129,11 @@ def process_excel_data(file_path):
             return len(size_order)  # 不在顺序中的放在最后
 
         # 按照尺寸顺序排序
-        sorted_items = sorted(items, key=get_sort_key)
+        sorted_items = sorted(merged_items, key=get_sort_key)
 
-        # 使用中文逗号连接，最后一个使用中文逗号
+        # 使用中文逗号连接
         if len(sorted_items) > 1:
-            # 前面部分用英文逗号，最后一个用中文逗号连接
-            result = '，'.join(sorted_items[:-1]) + '，' + sorted_items[-1]
+            result = '，'.join(sorted_items)
         else:
             result = ''.join(sorted_items)
 
@@ -113,7 +141,7 @@ def process_excel_data(file_path):
 
     # 生成最终结果
     result_df = grouped.groupby(['规格编码', '颜色'])['尺寸数量'].apply(
-        lambda x: sort_sizes(x.tolist())
+        lambda x: sort_and_merge_sizes(x.tolist())
     ).reset_index()
 
     result_df['结果'] = result_df['规格编码'] + '-' + result_df['颜色'] + '-' + result_df['尺寸数量']
